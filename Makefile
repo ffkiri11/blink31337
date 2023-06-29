@@ -1,59 +1,85 @@
-AVR_I_DIR= /usr/lib/avr/include
-CORE_SRC= /usr/share/arduino/hardware/arduino/avr/cores/arduino/main.cpp
-WIRING_SRC= /usr/share/arduino/hardware/arduino/avr/cores/arduino/wiring.c
-WD_SRC= /usr/share/arduino/hardware/arduino/avr/cores/arduino/wiring_digital.c
-HOOKS_SRC= /usr/share/arduino/hardware/arduino/avr/cores/arduino/hooks.c
-HW_I_DIR= /usr/share/arduino/hardware/arduino/avr/variants/eightanaloginputs
-ARDUINO_CORE_I_DIR= /usr/share/arduino/hardware/arduino/avr/cores/arduino
-DEFS= -DF_CPU=16000000
-MMCU= -mmcu=atmega328
-CC=avr-gcc
-CXX=avr-g++
-DEBUG=-g3
+#****************************************************************************#
+#*                         Arduino Makefile                                 *#
+#*                      (c) xerasovanon@gmail.com                           *#
+#*                         under BSD License                                *#
+#****************************************************************************#
+
+AVR_I_DIR=	/usr/lib/avr/include
+INO_BASE_DIR= 	/usr/share/arduino/hardware/arduino
+INO_SRC_DIR=	$(INO_BASE_DIR)/avr/cores/arduino
+HW_I_DIR=	$(INO_BASE_DIR)/avr/variants/eightanaloginputs
+
+CFLAGS=		-Wall -Os\
+		-flto -fuse-linker-plugin -Wl,--gc-sections -fwhole-program\
+		-funsigned-char\
+		-funsigned-bitfields\
+		-fno-inline-small-functions\
+		-fno-exceptions\
+		-mmcu=atmega328\
+		-DF_CPU=16000000L -DARDUINO=10607 -DARDUINO_AVR_NANO\
+		-DARDUINO_ARCH_AVR -fno-exceptions
+
+CPPFLAGS=	$(CFLAGS) -std=c++11 -lm -fpermissive\
+		-fno-threadsafe-statics -fno-threadsafe-statics
+
+CC=  		avr-gcc $(CFLAGS)
+CXX=		avr-g++ $(CPPFLAGS)
+
+DEBUG=		-g3
+CLI_INO_FLAGS=	-b arduino:avr:uno
+SKETCHNAME=	blink31337
+ARDUINO_CLI=	/data/develop/arduino-cli/bin/arduino-cli
+ARDUINO_CLI_PP=	$(ARDUINO_CLI) compile $(CLI_INO_FLAGS) --preprocess
+
+CORE_C_SRC=	$(wildcard $(INO_SRC_DIR)/*.c)
+
+CORE_CXX_SRC=	$(wildcard $(INO_SRC_DIR)/*.cpp)
+
+CORE_C_OBJ=	$(addsuffix .o, $(basename $(notdir $(CORE_C_SRC))))
+CORE_CXX_OBJ=	$(addsuffix .o, $(basename $(notdir $(CORE_CXX_SRC))))
 
 release: DEBUG=
-release: firmware
+release: debug
 
-firmware : blink31337.elf
-	avr-objcopy -j .text -j .data -O ihex blink31337.elf blink31337.hex
+debug: $(SKETCHNAME).hex
 
-blink31337.elf : main.o w_digital.o blink.o wiring.o hooks.o
-	$(CXX) -Os $(MMCU) -o blink31337.elf \
-		main.o \
-		w_digital.o \
-		blink.o \
-		wiring.o \
-		hooks.o
+$(SKETCHNAME).hex : $(SKETCHNAME).elf
+	avr-objcopy -j .text -j .data\
+		-O ihex $(SKETCHNAME).elf $(SKETCHNAME).hex
 
-main.o : $(CORE_SRC) blink.o w_digital.o
-	$(CXX) $(DEBUG) -Os $(DEFS) $(MMCU) $(CORE_SRC) \
-		-I $(ARDUINO_CORE_I_DIR) \
-		-I $(HW_I_DIR) -c -o main.o 
+$(SKETCHNAME).elf : $(CORE_C_OBJ) $(CORE_CXX_OBJ) $(SKETCHNAME).o
+	$(CXX) -Os $(MMCU) $(LDFLAGS)\
+	       -o $(SKETCHNAME).elf\
+	       -I $(INO_SRC_DIR)\
+	       -I $(HW_I_DIR)\
+		$(CORE_C_OBJ) $(CORE_CXX_OBJ)\
+		$(SKETCHNAME).o
 
-w_digital.o : $(WD_SRC)
-	$(CC) $(DEBUG) $(DEFS) $(MMCU) $(WD_SRC) \
-	       	-o w_digital.o -I $(HW_I_DIR) -I $(AVR_I_DIR) -c 
+$(SKETCHNAME).o : $(SKETCHNAME).cpp
+	$(CXX) -Os $(MMCU) $(LDFLAGS)\
+	       -o $(SKETCHNAME).o\
+	       -I $(INO_SRC_DIR)\
+	       -I $(HW_I_DIR)\
+	       -c $(SKETCHNAME).cpp
 
-blink.o : blink.cpp
-	$(CXX) $(DEBUG) $(DEFS) -Os $(MMCU) \
-		-I $(AVR_I_DIR)\
-		-I $(ARDUINO_CORE_I_DIR) \
-		-I $(HW_I_DIR) \
-		-c blink.cpp -o blink.o
+%.cpp : %.ino
+	$(ARDUINO_CLI_PP) . > $@
 
-wiring.o : $(WIRING_SRC) 
-	$(CC) $(DEBUG) $(DEFS) $(MMCU) \
-		-I $(AVR_I_DIR) \
-		-I $(HW_I_DIR) \
-		-c $(WIRING_SRC) \
-		-o wiring.o
+$(CORE_C_OBJ) : $(CORE_C_FILES)
+	$(CC) $(DEBUG) $(DEFS) $(MMCU)\
+		-I $(INO_SRC_DIR)\
+		-I $(HW_I_DIR)\
+		-I $(AVR_I_DIR) -c $(CORE_C_SRC)
 
-hooks.o : $(HOOKS_SRC)
-	$(CC) $(DEBUG) $(MMCU) \
-		-I $(AVR_I_DIR) \
-		-I $(HW_I_DIR) \
-		-c $(HOOKS_SRC) \
-		-o hooks.o
+$(CORE_CXX_OBJ) : $(CORE_CXX_FILES)
+	$(CXX) $(DEBUG) $(DEFS) $(MMCU)\
+		-I $(INO_SRC_DIR)\
+		-I $(HW_I_DIR)\
+		-I $(AVR_I_DIR) -c $(CORE_CXX_SRC)
+
 clean :
-	rm *.o *.elf *.hex
+	rm *.o *.elf *.hex $(SKETCHNAME).cpp
 
+tags : $(CORE_C_SRC) $(CORE_CXX_SRC) $(SKETCHNAME).cpp
+	ctags -R . $(INO_SRC_DIR)\
+	       $(CORE_C_SRC) $(CORE_CXX_SRC) $(SKETCHNAME).cpp
