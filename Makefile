@@ -1,8 +1,8 @@
-#****************************************************************************#
-#*                         Arduino Makefile                                 *#
-#*                      (c) xerasovanon@gmail.com                           *#
-#*                         under BSD License                                *#
-#****************************************************************************#
+#******************************************************************************#
+#**                         Arduino Makefile                                 **#
+#**                      (c) xerasovanon@gmail.com                           **#
+#**                         under BSD License                                **#
+#******************************************************************************#
 
 AVR_I_DIR=	/usr/lib/avr/include
 INO_BASE_DIR= 	/usr/share/arduino/hardware/arduino
@@ -27,7 +27,7 @@ CXX=		avr-g++ $(CPPFLAGS)
 
 DEBUG=		-g3
 CLI_INO_FLAGS=	-b arduino:avr:uno
-SKETCHNAME=	blink31337
+SKETCHNAME=	$(notdir $(PWD))
 ARDUINO_CLI=	/data/develop/arduino-cli/bin/arduino-cli
 ARDUINO_CLI_PP=	$(ARDUINO_CLI) compile $(CLI_INO_FLAGS) --preprocess
 
@@ -35,8 +35,8 @@ CORE_C_SRC=	$(wildcard $(INO_SRC_DIR)/*.c)
 
 CORE_CXX_SRC=	$(wildcard $(INO_SRC_DIR)/*.cpp)
 
-CORE_C_OBJ=	$(addsuffix .o, $(basename $(notdir $(CORE_C_SRC))))
-CORE_CXX_OBJ=	$(addsuffix .o, $(basename $(notdir $(CORE_CXX_SRC))))
+CORE_C_OBJ=	$(addsuffix .c.o, $(basename $(notdir $(CORE_C_SRC))))
+CORE_CXX_OBJ=	$(addsuffix .cpp.o, $(basename $(notdir $(CORE_CXX_SRC))))
 
 release: DEBUG=
 release: debug
@@ -52,30 +52,29 @@ $(SKETCHNAME).elf : $(CORE_C_OBJ) $(CORE_CXX_OBJ) $(SKETCHNAME).o
 	       -o $(SKETCHNAME).elf\
 	       -I $(INO_SRC_DIR)\
 	       -I $(HW_I_DIR)\
-		$(CORE_C_OBJ) $(CORE_CXX_OBJ)\
-		$(SKETCHNAME).o
+		$+
 
 $(SKETCHNAME).o : $(SKETCHNAME).cpp
 	$(CXX) -Os $(MMCU) $(LDFLAGS)\
 	       -o $(SKETCHNAME).o\
 	       -I $(INO_SRC_DIR)\
 	       -I $(HW_I_DIR)\
-	       -c $(SKETCHNAME).cpp
+	       -c $<
 
 %.cpp : %.ino
 	$(ARDUINO_CLI_PP) . > $@
 
-$(CORE_C_OBJ) : $(CORE_C_FILES)
+%.c.o : $(INO_SRC_DIR)/%.c
 	$(CC) $(DEBUG) $(DEFS) $(MMCU)\
 		-I $(INO_SRC_DIR)\
 		-I $(HW_I_DIR)\
-		-I $(AVR_I_DIR) -c $(CORE_C_SRC)
+		-I $(AVR_I_DIR) -c $< -o $@
 
-$(CORE_CXX_OBJ) : $(CORE_CXX_FILES)
+%.cpp.o : $(INO_SRC_DIR)/%.cpp
 	$(CXX) $(DEBUG) $(DEFS) $(MMCU)\
 		-I $(INO_SRC_DIR)\
 		-I $(HW_I_DIR)\
-		-I $(AVR_I_DIR) -c $(CORE_CXX_SRC)
+		-I $(AVR_I_DIR) -c $< -o $@
 
 clean :
 	rm *.o *.elf *.hex $(SKETCHNAME).cpp
