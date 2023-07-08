@@ -80,5 +80,5 @@ clean :
 	rm *.o *.elf *.hex $(SKETCHNAME).cpp
 
 tags : $(CORE_C_SRC) $(CORE_CXX_SRC) $(SKETCHNAME).cpp
-	ctags -R . $(INO_SRC_DIR)\
+	ctags -R . $(AVR_I_DIR) $(INO_SRC_DIR)\
 	       $(CORE_C_SRC) $(CORE_CXX_SRC) $(SKETCHNAME).cpp
